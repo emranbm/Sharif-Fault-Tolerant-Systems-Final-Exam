@@ -8,8 +8,9 @@ TASK_WCET = 10
 TASK_BCET = 1
 TASK_DEADLINE = 20
 ENERGY_CONSUMPTION_PER_MS = 100
+ONE_MS_TASK_FAILURE_PROBABILITY = pow(10, -4)
 
-CONCURRENCY_NUMBER = 16
+CONCURRENCY_NUMBER = 8
 
 
 def main():
@@ -121,8 +122,8 @@ def get_actual_time_spent(subtasks: List[int]) -> int:
 
 
 def is_subtask_failed(subtask: int) -> bool:
-    # Probability of failure: subtask * 10^-4
-    rand_num = random.randint(1, 10_000)
+    # Probability of failure: subtask * failure_prob
+    rand_num = random.randint(1, int(1 / ONE_MS_TASK_FAILURE_PROBABILITY))
     if rand_num <= subtask:
         return True
     else:
