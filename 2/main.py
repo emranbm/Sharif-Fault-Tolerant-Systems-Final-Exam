@@ -1,28 +1,41 @@
 
-from typing import List
+from typing import List, Tuple
 import random
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 TASK_WCET = 10
 TASK_BCET = 1
 TASK_DEADLINE = 20
 ENERGY_CONSUMPTION_PER_MS = 100
 
+CONCURRENCY_NUMBER = 16
+
 
 def main():
     n = int(input('Experiments count: '))
+    random.seed(datetime.now())
     if n < 1:
         raise Exception("Experiments count should be at least 1")
 
     type_a_actual_times: List[int] = []
     type_b_actual_times: List[int] = []
-    for i in range(n):
-        task_time = get_task_time()
-        type_a_subtasks = devide_to_subtasks_type_a(task_time)
-        type_b_subtasks = devide_to_subtasks_type_b(task_time)
-        actual_time_spent_type_a = get_actual_time_spent(type_a_subtasks)
-        actual_time_spent_type_b = get_actual_time_spent(type_b_subtasks)
-        type_a_actual_times.append(actual_time_spent_type_a)
-        type_b_actual_times.append(actual_time_spent_type_b)
+
+    if n % CONCURRENCY_NUMBER != 0:
+        print(
+            f"Warning: Experiments count should be product of {CONCURRENCY_NUMBER} to be exactly the same as number of performed experiments.")
+
+    futures = []
+    for i in range(CONCURRENCY_NUMBER):
+        with ThreadPoolExecutor() as executor:
+            future = executor.submit(
+                experiment_for_n, int(n / CONCURRENCY_NUMBER))
+            futures.append(future)
+
+    for future in futures:
+        result = future.result()
+        type_a_actual_times = type_a_actual_times + result[0]
+        type_b_actual_times = type_b_actual_times + result[1]
 
     type_a_failure_probability = get_failure_probability(type_a_actual_times)
     type_b_failure_probability = get_failure_probability(type_a_actual_times)
@@ -42,6 +55,29 @@ Type B:
 Failure Probability: {type_b_failure_probability}
 Average Energy Consumption: {type_b_avg_energy_consumption}
 """)
+
+
+def experiment_for_n(n: int) -> Tuple[List[int], List[int]]:
+    if n < 1:
+        raise Exception("Experiments count should be at least 1")
+
+    type_a_actual_times: List[int] = []
+    type_b_actual_times: List[int] = []
+    last_percent_completed = 0
+    for i in range(n):
+        percent_completed = int(i/n*100)
+        if percent_completed > last_percent_completed:
+            # print(f"{percent_completed}%  -  {i} out of {n} experiments done.\n")
+            last_percent_completed = percent_completed
+        task_time = get_task_time()
+        type_a_subtasks = devide_to_subtasks_type_a(task_time)
+        type_b_subtasks = devide_to_subtasks_type_b(task_time)
+        actual_time_spent_type_a = get_actual_time_spent(type_a_subtasks)
+        actual_time_spent_type_b = get_actual_time_spent(type_b_subtasks)
+        type_a_actual_times.append(actual_time_spent_type_a)
+        type_b_actual_times.append(actual_time_spent_type_b)
+
+    return type_a_actual_times, type_b_actual_times
 
 
 def get_task_time() -> int:
@@ -94,7 +130,7 @@ def is_subtask_failed(subtask: int) -> bool:
 
 
 def get_failure_probability(actual_times: List[int]) -> float:
-    failure_count = sum(t <= TASK_DEADLINE for t in actual_times)
+    failure_count = sum(t > TASK_DEADLINE for t in actual_times)
     return failure_count / len(actual_times)
 
 
