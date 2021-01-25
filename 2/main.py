@@ -10,7 +10,7 @@ TASK_DEADLINE = 20
 ENERGY_CONSUMPTION_PER_MS = 100
 ONE_MS_TASK_FAILURE_PROBABILITY = pow(10, -4)
 
-CONCURRENCY_NUMBER = 8
+CONCURRENCY_FACTOR = 8
 
 
 def main():
@@ -22,15 +22,15 @@ def main():
     type_a_actual_times: List[int] = []
     type_b_actual_times: List[int] = []
 
-    if n % CONCURRENCY_NUMBER != 0:
+    if n % CONCURRENCY_FACTOR != 0:
         print(
-            f"Warning: Experiments count should be product of {CONCURRENCY_NUMBER} to be exactly the same as number of performed experiments.")
+            f"Warning: Experiments count should be product of {CONCURRENCY_FACTOR} to be exactly the same as number of performed experiments.")
 
     futures = []
-    for i in range(CONCURRENCY_NUMBER):
+    for i in range(CONCURRENCY_FACTOR):
         with ThreadPoolExecutor() as executor:
             future = executor.submit(
-                experiment_for_n, int(n / CONCURRENCY_NUMBER))
+                experiment_for_n, int(n / CONCURRENCY_FACTOR))
             futures.append(future)
 
     for future in futures:
