@@ -4,31 +4,35 @@ from typing import List
 from numpy import random
 from datetime import datetime
 
-CONCURRENCY_NUMBER = 8
-END_TIME = 10_000
+CONCURRENCY_FACTOR = 8
+END_TIME = None
 MTTF = 100
 
 
 def main():
     n = int(input("Number of experiments: "))
+    global END_TIME
+    END_TIME = int(input("Each simulation time: "))
     random.seed((datetime.now() - datetime(2000, 1, 1)).seconds)
-    if n % CONCURRENCY_NUMBER != 0:
+    if n % CONCURRENCY_FACTOR != 0:
         print(
-            f"Warning: Experiments count should be product of {CONCURRENCY_NUMBER} to be exactly the same as number of performed experiments.")
+            f"Warning: Experiments count should be product of {CONCURRENCY_FACTOR} to be exactly the same as number of performed experiments.")
     futures = []
-    for i in range(CONCURRENCY_NUMBER):
+    for i in range(CONCURRENCY_FACTOR):
         with ThreadPoolExecutor() as executor:
             future = executor.submit(
-                experiment_for_n, int(n / CONCURRENCY_NUMBER))
+                experiment_for_n, int(n / CONCURRENCY_FACTOR))
             futures.append(future)
 
     failure_times = []
     for future in futures:
         failure_times += future.result()
 
-    availability_sum = sum(a for a in failure_times)
-    availability = availability_sum / CONCURRENCY_NUMBER
-    print(f"Steady Availabilty: {availability_sum}")
+    total_failure_time = sum(a for a in failure_times)
+    availability = 1 - total_failure_time / END_TIME
+    print(f"Total Failure Time: {total_failure_time}")
+    print(f"Failures Count: {len(failure_times)}")
+    print(f"Steady Availabilty: {availability}")
 
 
 def experiment_for_n(n: int) -> int:
@@ -37,8 +41,9 @@ def experiment_for_n(n: int) -> int:
 
     modules: List[int] = [0, 0, 0, 0]
     failure_times: List[int] = []
+    system_last_fail = None
     for _ in range(n):
-        for i in range(END_TIME):
+        for t in range(END_TIME):
             for i, m in enumerate(modules):
                 if m == 0:  # ready to start
                     modules[i] = int(random.exponential(scale=MTTF))  # TTF
@@ -50,10 +55,14 @@ def experiment_for_n(n: int) -> int:
                         modules[i] = - \
                             int(random.uniform(low=0, high=100))  # TTR
             number_of_non_working_modules = sum(m <= 0 for m in modules)
-            if number_of_non_working_modules > 2:
-                # failure happend!
-                failure_times.append(i)
-                break
+            currently_failed = number_of_non_working_modules > 2
+            if system_last_fail:
+                if not currently_failed:
+                    failure_times.append(t - system_last_fail)
+                    system_last_fail = None
+            else:
+                if currently_failed:
+                    system_last_fail = t
     return failure_times
 
 
